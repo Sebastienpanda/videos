@@ -3,8 +3,7 @@ package main
 import (
 	"books/controllers"
 	"books/initializers"
-
-	"github.com/gin-gonic/gin"
+	"net/http"
 )
 
 func init() {
@@ -13,14 +12,12 @@ func init() {
 }
 
 func main() {
-	r := gin.Default()
-	video := r.Group("/api/v1")
-	{
-		video.GET("/videos", controllers.VideosIndex)
-		video.GET("/videos/:id", controllers.VideosShow)
-		video.POST("/videos", controllers.VideosCreate)
-		video.PUT("/videos/:id", controllers.VideosUpdate)
-		video.DELETE("/videos/:id", controllers.VideosDelete)
-	}
-	r.Run()
+
+	http.HandleFunc("/api/v1/videos/create", controllers.VideosCreate)
+	http.HandleFunc("/api/v1/videos", controllers.VideosIndex)
+	http.HandleFunc("/api/v1/videos/", controllers.VideosShow)
+	http.HandleFunc("/api/v1/videos/update/", controllers.VideosUpdate)
+	http.HandleFunc("/api/v1/videos/delete/", controllers.VideosDelete)
+
+	http.ListenAndServe(":3000", nil)
 }

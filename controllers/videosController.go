@@ -5,30 +5,36 @@ import (
 	"books/models"
 	"books/utils"
 	"books/validators"
+	"encoding/json"
 	"errors"
 	"net/http"
+	"strings"
 
-	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 
-func VideosCreate(c *gin.Context) {
-
+func VideosCreate(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Title   string
 		Content string
 	}
 
-	c.Bind(&body)
-
-	err := validators.ValidateVideos(body.Title, body.Content)
+	decoder := json.NewDecoder(r.Body)
+	err := decoder.Decode(&body)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	err = validators.ValidateVideos(body.Title, body.Content)
+	if err != nil {
+		json.NewEncoder(w).Encode(map[string]interface{}{
 			"error":   err.Error(),
 			"success": false,
 		})
 		return
 	}
+
 	titleUppercaseLetters := utils.ToTitleCase(body.Title)
 
 	video := models.Video{Title: titleUppercaseLetters, Content: body.Content}
@@ -36,58 +42,62 @@ func VideosCreate(c *gin.Context) {
 	result := initializers.DB.Create(&video)
 
 	if result.Error != nil {
-		c.Status(http.StatusBadRequest)
 		return
 	}
 
-	c.JSON(http.StatusCreated, gin.H{
+	json.NewEncoder(w).Encode(map[string]interface{}{
 		"video":   video,
 		"success": true,
 	})
 }
 
-func VideosIndex(c *gin.Context) {
-	var Videos []models.Video
-	initializers.DB.Find(&Videos)
+func VideosIndex(w http.ResponseWriter, r *http.Request) {
+	var videos []models.Video
+	initializers.DB.Find(&videos)
 
-	c.JSON(http.StatusOK, gin.H{
-		"videos":  Videos,
-		"success": true,
-	})
+	json.NewEncoder(w).Encode(videos)
 }
 
-func VideosShow(c *gin.Context) {
-	id := c.Param("id")
+func VideosShow(w http.ResponseWriter, r *http.Request) {
+	parts := strings.Split(r.URL.Path, "/")
+	id := parts[len(parts)-1]
 	var video models.Video
-
 	dbResult := initializers.DB.First(&video, id)
 
 	if errors.Is(dbResult.Error, gorm.ErrRecordNotFound) {
-		c.JSON(http.StatusNotFound, gin.H{
+		json.NewEncoder(w).Encode(map[string]interface{}{
 			"error":   "Record not found",
 			"success": false,
 		})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
+	json.NewEncoder(w).Encode(map[string]interface{}{
 		"video":   video,
 		"success": true,
 	})
 }
 
-func VideosUpdate(c *gin.Context) {
+func VideosUpdate(w http.ResponseWriter, r *http.Request) {
+	parts := strings.Split(r.URL.Path, "/")
+	id := parts[len(parts)-1]
+
 	var body struct {
 		Title   string
 		Content string
 	}
 
-	c.Bind(&body)
+	decoder := json.NewDecoder(r.Body)
+	err := decoder.Decode(&body)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 
 	var video models.Video
-	dbResult := initializers.DB.First(&video, c.Param("id"))
+	dbResult := initializers.DB.First(&video, id)
 	if errors.Is(dbResult.Error, gorm.ErrRecordNotFound) {
-		c.JSON(http.StatusNotFound, gin.H{
+		json.NewEncoder(w).Encode(map[string]interface{}{
 			"error":   "Record not found",
 			"success": false,
 		})
@@ -96,24 +106,23 @@ func VideosUpdate(c *gin.Context) {
 
 	initializers.DB.Model(&video).Updates(models.Video{Title: body.Title, Content: body.Content})
 
-	c.JSON(http.StatusOK, gin.H{
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]interface{}{
 		"video":   video,
 		"success": true,
 	})
 }
-
-func VideosDelete(c *gin.Context) {
-	id := c.Param("id")
+func VideosDelete(w http.ResponseWriter, r *http.Request) {
+	parts := strings.Split(r.URL.Path, "/")
+	id := parts[len(parts)-1]
 
 	dbResult := initializers.DB.Delete(&models.Video{}, id)
 
 	if errors.Is(dbResult.Error, gorm.ErrRecordNotFound) {
-		c.JSON(http.StatusNotFound, gin.H{
+		json.NewEncoder(w).Encode(map[string]interface{}{
 			"error":   "Record not found",
 			"success": false,
 		})
 		return
 	}
-
-	c.Status(http.StatusOK)
 }
